@@ -17,8 +17,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 class WPIR_Crop_Page {
 
     public function __construct() {
-        add_action( 'admin_menu',        array( $this, 'register_page' ) );
-        add_filter( 'media_row_actions', array( $this, 'add_row_action' ), 10, 2 );
+        add_action( 'admin_menu',                       array( $this, 'register_page' ) );
+        add_filter( 'media_row_actions',                array( $this, 'add_row_action' ), 10, 2 );
+        add_action( 'attachment_submitbox_misc_actions', array( $this, 'render_submitbox_link' ), 20 );
     }
 
     /**
@@ -53,6 +54,30 @@ class WPIR_Crop_Page {
             esc_html__( 'Manage Crops', 'wp-image-resizer' )
         );
         return $actions;
+    }
+
+    /**
+     * Add a "Manage Crops" link to the Publish/Update meta box on the
+     * attachment edit screen (wp-admin/post.php?post=ID&action=edit).
+     */
+    public function render_submitbox_link() {
+        global $post;
+        if ( ! $post || 'attachment' !== $post->post_type ) {
+            return;
+        }
+        if ( strpos( $post->post_mime_type, 'image/' ) !== 0 ) {
+            return;
+        }
+        if ( ! current_user_can( 'upload_files' ) ) {
+            return;
+        }
+        $url = admin_url( 'upload.php?page=wpir-crops&attachment_id=' . $post->ID );
+        ?>
+        <div class="misc-pub-section misc-pub-wpir-crops">
+            <span class="dashicons dashicons-image-crop" style="color:#82878c;vertical-align:middle;"></span>
+            <a href="<?php echo esc_url( $url ); ?>"><?php esc_html_e( 'Manage Crops', 'wp-image-resizer' ); ?></a>
+        </div>
+        <?php
     }
 
     /**

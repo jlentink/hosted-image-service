@@ -13,9 +13,10 @@ import (
 type CropMode int
 
 const (
-	CropCenter    CropMode = iota // Center crop
-	CropSmart                     // Attention-based smart crop (libvips)
-	CropFocalPoint                // Custom focal point crop
+	CropCenter     CropMode = iota // Center crop
+	CropSmart                      // Attention-based smart crop (libvips)
+	CropFocalPoint                 // Custom focal point crop
+	CropRect                       // Explicit source rectangle (CropX/Y/W/H as fractions of source)
 )
 
 // OutputFormat defines the output image format.
@@ -36,6 +37,10 @@ type ProcessRequest struct {
 	Crop      CropMode     // Crop strategy
 	FocalX    float64      // Focal point X (0.0-1.0), only used with CropFocalPoint
 	FocalY    float64      // Focal point Y (0.0-1.0), only used with CropFocalPoint
+	CropX     float64      // Source rect left (0.0-1.0), only used with CropRect
+	CropY     float64      // Source rect top  (0.0-1.0), only used with CropRect
+	CropW     float64      // Source rect width  (0.0-1.0), only used with CropRect
+	CropH     float64      // Source rect height (0.0-1.0), only used with CropRect
 	Format    OutputFormat // Output format
 	Quality   int          // Quality/compression (0 = use default)
 }
@@ -121,6 +126,14 @@ func (p *Processor) validateRequest(req *ProcessRequest) error {
 			return fmt.Errorf("focal point coordinates must be between 0.0 and 1.0")
 		}
 	}
+	if req.Crop == CropRect {
+		if req.CropX < 0 || req.CropX > 1 || req.CropY < 0 || req.CropY > 1 {
+			return fmt.Errorf("rect origin must be between 0.0 and 1.0")
+		}
+		if req.CropW <= 0 || req.CropH <= 0 || req.CropX+req.CropW > 1.0001 || req.CropY+req.CropH > 1.0001 {
+			return fmt.Errorf("rect size must be positive and stay inside the source image")
+		}
+	}
 	if !isValidFormat(req.Format) {
 		return fmt.Errorf("unsupported format: %s", req.Format)
 	}
@@ -136,6 +149,8 @@ func (p *Processor) resizeAndCrop(img *vips.ImageRef, req *ProcessRequest) error
 		return p.smartCrop(img, req.Width, req.Height)
 	case CropFocalPoint:
 		return p.focalPointCrop(img, req.Width, req.Height, req.FocalX, req.FocalY)
+	case CropRect:
+		return p.rectCrop(img, req.Width, req.Height, req.CropX, req.CropY, req.CropW, req.CropH)
 	default:
 		return p.centerCrop(img, req.Width, req.Height)
 	}
@@ -149,6 +164,52 @@ func (p *Processor) centerCrop(img *vips.ImageRef, width, height int) error {
 // smartCrop uses libvips attention-based smart crop.
 func (p *Processor) smartCrop(img *vips.ImageRef, width, height int) error {
 	return img.Thumbnail(width, height, vips.InterestingAttention)
+}
+
+// rectCrop extracts the given source rectangle (fractions of original
+// dimensions) and resizes it to width × height. Used for user-defined crop
+// rectangles where both position AND size matter (e.g. zoom-in via the manual
+// crop editor).
+func (p *Processor) rectCrop(img *vips.ImageRef, width, height int, fx, fy, fw, fh float64) error {
+	origW := float64(img.Width())
+	origH := float64(img.PageHeight())
+
+	// Convert fractional rect to pixel coordinates in the source image.
+	srcLeft := int(math.Round(fx * origW))
+	srcTop := int(math.Round(fy * origH))
+	srcW := int(math.Round(fw * origW))
+	srcH := int(math.Round(fh * origH))
+
+	// Clamp to image bounds.
+	if srcLeft < 0 {
+		srcLeft = 0
+	}
+	if srcTop < 0 {
+		srcTop = 0
+	}
+	if srcLeft+srcW > int(origW) {
+		srcW = int(origW) - srcLeft
+	}
+	if srcTop+srcH > int(origH) {
+		srcH = int(origH) - srcTop
+	}
+	if srcW <= 0 || srcH <= 0 {
+		return fmt.Errorf("rect crop produced empty area")
+	}
+
+	if err := img.ExtractArea(srcLeft, srcTop, srcW, srcH); err != nil {
+		return fmt.Errorf("rect crop extract: %w", err)
+	}
+
+	// Resize the extracted rect to the target dimensions. Use independent
+	// horizontal/vertical scale since the source rect already matches the
+	// target aspect ratio (or close to it — the editor enforces ratio).
+	hScale := float64(width) / float64(img.Width())
+	vScale := float64(height) / float64(img.PageHeight())
+	if err := img.ResizeWithVScale(hScale, vScale, vips.KernelLanczos3); err != nil {
+		return fmt.Errorf("rect crop resize: %w", err)
+	}
+	return nil
 }
 
 // focalPointCrop resizes then crops around a focal point.
@@ -240,27 +301,66 @@ func (p *Processor) resolveQuality(requested, defaultVal int) int {
 	return defaultVal
 }
 
-// ParseCropMode parses a crop string from the API into a CropMode and optional focal point.
-// Accepted values: "center", "smart", "0.5,0.3" (focal point x,y)
-func ParseCropMode(s string) (CropMode, float64, float64, error) {
+// CropSpec is the fully-parsed crop directive: mode + any associated
+// coordinates (focal point for CropFocalPoint, source rectangle for CropRect).
+type CropSpec struct {
+	Mode   CropMode
+	FocalX float64
+	FocalY float64
+	RectX  float64
+	RectY  float64
+	RectW  float64
+	RectH  float64
+}
+
+// ParseCropSpec parses a crop string from the API.
+// Accepted values:
+//   - "center" / "centre" / ""  → CropCenter
+//   - "smart" / "attention"     → CropSmart
+//   - "x,y"                     → CropFocalPoint (focal point, fractions 0..1)
+//   - "rect:x,y,w,h"            → CropRect      (source rectangle, fractions 0..1)
+func ParseCropSpec(s string) (CropSpec, error) {
 	s = strings.TrimSpace(strings.ToLower(s))
 
 	switch s {
 	case "", "center", "centre":
-		return CropCenter, 0, 0, nil
+		return CropSpec{Mode: CropCenter}, nil
 	case "smart", "attention":
-		return CropSmart, 0, 0, nil
-	default:
-		var x, y float64
-		n, err := fmt.Sscanf(s, "%f,%f", &x, &y)
-		if err != nil || n != 2 {
-			return 0, 0, 0, fmt.Errorf("invalid crop mode: %q (use 'center', 'smart', or 'x,y' coordinates)", s)
-		}
-		if x < 0 || x > 1 || y < 0 || y > 1 {
-			return 0, 0, 0, fmt.Errorf("focal point coordinates must be between 0.0 and 1.0, got %f,%f", x, y)
-		}
-		return CropFocalPoint, x, y, nil
+		return CropSpec{Mode: CropSmart}, nil
 	}
+
+	if strings.HasPrefix(s, "rect:") {
+		var x, y, w, h float64
+		n, err := fmt.Sscanf(strings.TrimPrefix(s, "rect:"), "%f,%f,%f,%f", &x, &y, &w, &h)
+		if err != nil || n != 4 {
+			return CropSpec{}, fmt.Errorf("invalid rect crop: %q (use 'rect:x,y,w,h' with fractions 0..1)", s)
+		}
+		if x < 0 || x > 1 || y < 0 || y > 1 || w <= 0 || h <= 0 || x+w > 1.0001 || y+h > 1.0001 {
+			return CropSpec{}, fmt.Errorf("rect crop coordinates out of range: %f,%f,%f,%f", x, y, w, h)
+		}
+		return CropSpec{Mode: CropRect, RectX: x, RectY: y, RectW: w, RectH: h}, nil
+	}
+
+	var x, y float64
+	n, err := fmt.Sscanf(s, "%f,%f", &x, &y)
+	if err != nil || n != 2 {
+		return CropSpec{}, fmt.Errorf("invalid crop mode: %q (use 'center', 'smart', 'x,y' or 'rect:x,y,w,h')", s)
+	}
+	if x < 0 || x > 1 || y < 0 || y > 1 {
+		return CropSpec{}, fmt.Errorf("focal point coordinates must be between 0.0 and 1.0, got %f,%f", x, y)
+	}
+	return CropSpec{Mode: CropFocalPoint, FocalX: x, FocalY: y}, nil
+}
+
+// ParseCropMode is the legacy API kept for backwards compatibility. It only
+// returns mode + focal point (no rect data). Prefer ParseCropSpec for full
+// support.
+func ParseCropMode(s string) (CropMode, float64, float64, error) {
+	spec, err := ParseCropSpec(s)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	return spec.Mode, spec.FocalX, spec.FocalY, nil
 }
 
 // ParseFormat parses and validates an output format string.

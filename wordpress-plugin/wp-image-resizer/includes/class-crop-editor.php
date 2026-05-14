@@ -236,10 +236,31 @@ class WPIR_Crop_Editor {
         $focal_x = max( 0.0, min( 1.0, $focal_x ) );
         $focal_y = max( 0.0, min( 1.0, $focal_y ) );
 
+        $stored = array( 'x' => $focal_x, 'y' => $focal_y );
+
+        // Optional explicit source rectangle (zoom + reposition). All fractions 0..1.
+        if ( isset( $_POST['rect_x'], $_POST['rect_y'], $_POST['rect_w'], $_POST['rect_h'] ) ) {
+            $rx = max( 0.0, min( 1.0, floatval( $_POST['rect_x'] ) ) );
+            $ry = max( 0.0, min( 1.0, floatval( $_POST['rect_y'] ) ) );
+            $rw = max( 0.0, min( 1.0, floatval( $_POST['rect_w'] ) ) );
+            $rh = max( 0.0, min( 1.0, floatval( $_POST['rect_h'] ) ) );
+            if ( $rw > 0 && $rh > 0 ) {
+                // Clamp so rect stays inside the source image.
+                if ( $rx + $rw > 1.0 ) { $rw = 1.0 - $rx; }
+                if ( $ry + $rh > 1.0 ) { $rh = 1.0 - $ry; }
+                $stored['rect'] = array(
+                    'x' => $rx,
+                    'y' => $ry,
+                    'w' => $rw,
+                    'h' => $rh,
+                );
+            }
+        }
+
         update_post_meta(
             $attachment_id,
             $meta_key,
-            wp_json_encode( array( 'x' => $focal_x, 'y' => $focal_y ) )
+            wp_json_encode( $stored )
         );
 
         $regenerated = false;
@@ -273,8 +294,20 @@ class WPIR_Crop_Editor {
             $raw = get_post_meta( $attachment_id, self::META_SIZE_FOCAL_PREFIX . $size_name, true );
             if ( $raw ) {
                 $data = json_decode( $raw, true );
-                if ( $data && isset( $data['x'], $data['y'] ) ) {
-                    return sprintf( '%.4f,%.4f', (float) $data['x'], (float) $data['y'] );
+                if ( $data ) {
+                    // Explicit rect (zoom-aware) takes priority over focal point.
+                    if ( isset( $data['rect']['x'], $data['rect']['y'], $data['rect']['w'], $data['rect']['h'] ) ) {
+                        return sprintf(
+                            'rect:%.4f,%.4f,%.4f,%.4f',
+                            (float) $data['rect']['x'],
+                            (float) $data['rect']['y'],
+                            (float) $data['rect']['w'],
+                            (float) $data['rect']['h']
+                        );
+                    }
+                    if ( isset( $data['x'], $data['y'] ) ) {
+                        return sprintf( '%.4f,%.4f', (float) $data['x'], (float) $data['y'] );
+                    }
                 }
             }
         }

@@ -1,5 +1,6 @@
 services:
   image-service:
+    container_name: image-service
     build:
       context: .
       dockerfile: Dockerfile

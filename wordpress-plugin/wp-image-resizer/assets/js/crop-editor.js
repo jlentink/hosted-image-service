@@ -270,15 +270,33 @@
             // Set explicit height so the overlay is contained correctly.
             tool.imgWrap.style.height = dH + 'px';
 
-            // Crop rect dimensions in display space (clamped to min and image bounds).
+            var sf = sizeFocals[size.name];
+
+            // If a saved rect exists, use its exact dimensions (zoom preserved).
+            if (sf && sf.rect && sf.rect.w > 0 && sf.rect.h > 0) {
+                var rW = Math.max(MIN_RECT_PX, Math.round(sf.rect.w * dW));
+                var rH = Math.max(MIN_RECT_PX, Math.round(sf.rect.h * dH));
+                var rL = Math.round(sf.rect.x * dW);
+                var rT = Math.round(sf.rect.y * dH);
+                rW = Math.min(rW, dW);
+                rH = Math.min(rH, dH);
+                rL = clamp(rL, 0, dW - rW);
+                rT = clamp(rT, 0, dH - rH);
+                tool.cropRect.style.width  = rW + 'px';
+                tool.cropRect.style.height = rH + 'px';
+                tool.cropRect.style.left   = rL + 'px';
+                tool.cropRect.style.top    = rT + 'px';
+                return;
+            }
+
+            // No rect saved — use the natural "cover" size for this thumbnail.
             var rectW = Math.min(Math.max(MIN_RECT_PX, Math.round(tw / backendScale / origW * dW)), dW);
             var rectH = Math.min(Math.max(MIN_RECT_PX, Math.round(th / backendScale / origH * dH)), dH);
 
             tool.cropRect.style.width  = rectW + 'px';
             tool.cropRect.style.height = rectH + 'px';
 
-            // Initial position from stored per-size focal, or center.
-            var sf = sizeFocals[size.name];
+            // Position from stored focal, or center.
             var fx = sf ? sf.x : 0.5;
             var fy = sf ? sf.y : 0.5;
 
@@ -390,6 +408,22 @@
             };
         }
 
+        // ---- Derive the source rect (as fractions 0..1) from the display rect ----
+        function getRect() {
+            var dW = tool.imgWrap.offsetWidth || 300;
+            var dH = tool.imgWrap.offsetHeight || Math.round(origH * dW / origW);
+            var rectW = parseInt(tool.cropRect.style.width,  10) || 0;
+            var rectH = parseInt(tool.cropRect.style.height, 10) || 0;
+            var left  = parseInt(tool.cropRect.style.left,   10) || 0;
+            var top   = parseInt(tool.cropRect.style.top,    10) || 0;
+            return {
+                x: clamp(left  / dW, 0, 1),
+                y: clamp(top   / dH, 0, 1),
+                w: clamp(rectW / dW, 0, 1),
+                h: clamp(rectH / dH, 0, 1)
+            };
+        }
+
         // ---- Close ----
         function closeTool() {
             tool.el.style.display = 'none';
@@ -440,17 +474,22 @@
 
         tool.saveBtn.addEventListener('click', function () {
             var focal = getFocal();
+            var rect  = getRect();
             tool.savedMsg.textContent = wpirL10n.regenerating || 'Regenerating…';
             tool.savedMsg.classList.add('visible');
             postSizeFocal(
                 {
                     focal_x:    focal.x.toFixed(4),
                     focal_y:    focal.y.toFixed(4),
+                    rect_x:     rect.x.toFixed(4),
+                    rect_y:     rect.y.toFixed(4),
+                    rect_w:     rect.w.toFixed(4),
+                    rect_h:     rect.h.toFixed(4),
                     clear:      '0',
                     regenerate: '1'
                 },
                 function () {
-                    sizeFocals[size.name] = focal;
+                    sizeFocals[size.name] = { x: focal.x, y: focal.y, rect: rect };
                     badge.style.display = 'inline-block';
                     tool.savedMsg.textContent = wpirL10n.cropSaved || 'Crop saved!';
                     onSaveOrClear();

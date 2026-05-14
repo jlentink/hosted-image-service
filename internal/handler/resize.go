@@ -59,7 +59,7 @@ func (h *ResizeHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	if cropStr == "" {
 		cropStr = "center"
 	}
-	cropMode, focalX, focalY, err := img.ParseCropMode(cropStr)
+	cropSpec, err := img.ParseCropSpec(cropStr)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "crop: %s", err.Error())
 		return
@@ -104,9 +104,13 @@ func (h *ResizeHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		ImageData: imageData,
 		Width:     width,
 		Height:    height,
-		Crop:      cropMode,
-		FocalX:    focalX,
-		FocalY:    focalY,
+		Crop:      cropSpec.Mode,
+		FocalX:    cropSpec.FocalX,
+		FocalY:    cropSpec.FocalY,
+		CropX:     cropSpec.RectX,
+		CropY:     cropSpec.RectY,
+		CropW:     cropSpec.RectW,
+		CropH:     cropSpec.RectH,
 		Format:    format,
 		Quality:   quality,
 	})

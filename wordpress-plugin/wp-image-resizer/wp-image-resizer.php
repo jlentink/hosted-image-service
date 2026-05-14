@@ -3,7 +3,7 @@
  * Plugin Name: WP Image Resizer
  * Plugin URI:  https://github.com/jlentink/image-service
  * Description: Offloads image resizing and cropping to an external image-service instance. Supports JPEG, PNG, WebP, and AVIF with smart crop and focal point crop.
- * Version:     1.0.0
+ * Version:     0.0.1
  * Author:      jlentink
  * License:     GPL-2.0-or-later
  * Text Domain: wp-image-resizer
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'WPIR_VERSION', '1.0.0' );
+define( 'WPIR_VERSION', '0.0.1' );
 define( 'WPIR_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WPIR_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'WPIR_PLUGIN_BASENAME', plugin_basename( __FILE__ ) );

@@ -34,7 +34,7 @@ clean:
 # Build Docker image
 docker:
     docker build \
-        --build-arg VERSION={{VERSION}} \
+        --build bum-arg VERSION={{VERSION}} \
         --build-arg BUILD_DATE={{BUILD_DATE}} \
         -t image-service:{{VERSION}} \
         -t image-service:latest .

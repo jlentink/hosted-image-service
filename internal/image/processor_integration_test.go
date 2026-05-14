@@ -9,8 +9,29 @@ import (
 	"github.com/davidbyttow/govips/v2/vips"
 )
 
+// avifEncoderAvailable is set at test startup by probing the AVIF encoder.
+// Ubuntu 24.04's apt libheif1 is built without AV1 encoder support, so AVIF
+// export fails at runtime even though the package is installed. We detect this
+// once and skip individual tests rather than letting them fail with an opaque
+// "heifsave: Unsupported compression" error.
+var avifEncoderAvailable bool
+
+// probeAVIFEncoder returns true if the AVIF encoder is available in the
+// current libheif/libvips build. It creates a minimal 1x1 image and attempts
+// to export it as AVIF.
+func probeAVIFEncoder() bool {
+	img, err := vips.Black(1, 1)
+	if err != nil {
+		return false
+	}
+	defer img.Close()
+	_, _, err = img.ExportAvif(&vips.AvifExportParams{Quality: 50})
+	return err == nil
+}
+
 func TestMain(m *testing.M) {
 	vips.Startup(nil)
+	avifEncoderAvailable = probeAVIFEncoder()
 	code := m.Run()
 	vips.Shutdown()
 	os.Exit(code)
@@ -133,6 +154,9 @@ func TestProcessFormatConversion(t *testing.T) {
 
 	for _, f := range formats {
 		t.Run(string(f.format), func(t *testing.T) {
+			if f.format == FormatAVIF && !avifEncoderAvailable {
+				t.Skip("AVIF encoding not supported by this libheif build (missing AV1 encoder)")
+			}
 			result, err := p.Process(&ProcessRequest{
 				ImageData: imgData,
 				Width:     100,

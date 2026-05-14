@@ -1,0 +1,156 @@
+/**
+ * WP Image Resizer — Focal Point & Crop Editor
+ */
+
+.wpir-focal-point-wrap {
+    margin: 12px 0;
+}
+
+.wpir-focal-point-wrap label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.wpir-focal-point-container {
+    position: relative;
+    display: inline-block;
+    max-width: 100%;
+    cursor: crosshair;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+    overflow: hidden;
+    line-height: 0;
+}
+
+.wpir-focal-point-container img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    pointer-events: none;
+    user-select: none;
+}
+
+.wpir-focal-point-marker {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    margin-left: -12px;
+    margin-top: -12px;
+    border-radius: 50%;
+    border: 3px solid #fff;
+    background: rgba(0, 115, 170, 0.7);
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.3);
+    pointer-events: none;
+    transition: left 0.1s ease, top 0.1s ease;
+    z-index: 10;
+}
+
+.wpir-focal-point-marker::after {
+    content: '+';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #fff;
+    font-size: 16px;
+    font-weight: bold;
+    line-height: 1;
+}
+
+.wpir-focal-coords {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+    align-items: center;
+}
+
+.wpir-focal-coords span {
+    font-size: 12px;
+    color: #666;
+    font-family: monospace;
+}
+
+.wpir-focal-actions {
+    margin-top: 8px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.wpir-focal-actions .button {
+    min-height: 30px;
+}
+
+.wpir-focal-saved {
+    color: #00a32a;
+    font-size: 13px;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.wpir-focal-saved.visible {
+    opacity: 1;
+}
+
+/* Crop mode selector */
+.wpir-crop-mode-wrap {
+    margin: 12px 0;
+}
+
+.wpir-crop-mode-wrap label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.wpir-crop-mode-options {
+    display: flex;
+    gap: 8px;
+}
+
+.wpir-crop-mode-options .button {
+    min-width: 80px;
+    text-align: center;
+}
+
+.wpir-crop-mode-options .button.active {
+    background: #0073aa;
+    color: #fff;
+    border-color: #006799;
+}
+
+/* Preview thumbnails */
+.wpir-preview-sizes {
+    margin-top: 16px;
+}
+
+.wpir-preview-sizes h4 {
+    margin: 0 0 8px 0;
+}
+
+.wpir-preview-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.wpir-preview-item {
+    text-align: center;
+    background: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 8px;
+}
+
+.wpir-preview-item img {
+    display: block;
+    max-width: 150px;
+    max-height: 150px;
+    margin: 0 auto 4px;
+}
+
+.wpir-preview-item .wpir-size-label {
+    font-size: 11px;
+    color: #666;
+}

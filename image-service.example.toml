@@ -1,0 +1,46 @@
+# Image Service Configuration
+# Copy this file to config.toml and adjust values for your environment.
+
+[server]
+port = 8080
+host = "0.0.0.0"
+max_upload_size = "50MB"
+read_timeout = "30s"
+write_timeout = "60s"
+
+[auth]
+# REQUIRED: Shared secret for JWT authentication.
+# Must match the secret configured in your WordPress plugin.
+jwt_secret = "change-me-to-a-strong-random-secret"
+jwt_expiry = "5m"
+
+# REQUIRED: Domains allowed to use this service.
+# Each domain must match the "domain" claim embedded in the JWT AND the
+# X-Site-Domain header sent with every request.
+# Use the bare hostname — no scheme, no trailing slash (e.g. "example.com").
+allowed_domains = ["localhost"]
+
+[whitelist]
+# Enable IP whitelist to restrict access to known clients.
+enabled = false
+ips = ["127.0.0.1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
+domains = ["localhost"]
+
+[image]
+max_width = 4096
+max_height = 4096
+default_quality_jpeg = 85
+default_quality_webp = 80
+default_quality_avif = 60
+default_quality_png = 6     # PNG compression level 0-9
+allowed_formats = ["jpeg", "png", "webp", "avif"]
+max_fetch_size = "20MB"     # Max size when fetching images by URL
+allowed_fetch_domains = []  # Empty = allow all domains; set to restrict
+
+[logging]
+level = "info"  # trace, debug, info, warn, error, fatal
+file = ""       # Optional: path to log file (empty = stdout only)
+
+[metrics]
+enabled = false
+path = "/metrics"

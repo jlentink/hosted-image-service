@@ -1,0 +1,33 @@
+# Binary
+image-service
+/image-service
+
+# Config with secrets
+image-service.toml
+
+# Go
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml
+
+# Test artifacts
+coverage.out
+coverage.html

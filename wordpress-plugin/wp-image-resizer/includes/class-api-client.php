@@ -61,8 +61,9 @@ class WPIR_API_Client {
             array(
                 'timeout'   => 60,
                 'headers'   => array(
-                    'Authorization' => 'Bearer ' . $token,
-                    'Content-Type'  => 'multipart/form-data; boundary=' . $boundary,
+                    'Authorization'  => 'Bearer ' . $token,
+                    'Content-Type'   => 'multipart/form-data; boundary=' . $boundary,
+                    'X-Site-Domain'  => wp_parse_url( home_url(), PHP_URL_HOST ),
                 ),
                 'body'      => $body,
                 'sslverify' => apply_filters( 'wpir_sslverify', true ),
@@ -131,8 +132,9 @@ class WPIR_API_Client {
             array(
                 'timeout'   => 60,
                 'headers'   => array(
-                    'Authorization' => 'Bearer ' . $token,
-                    'Content-Type'  => 'multipart/form-data; boundary=' . $boundary,
+                    'Authorization'  => 'Bearer ' . $token,
+                    'Content-Type'   => 'multipart/form-data; boundary=' . $boundary,
+                    'X-Site-Domain'  => wp_parse_url( home_url(), PHP_URL_HOST ),
                 ),
                 'body'      => $body,
                 'sslverify' => apply_filters( 'wpir_sslverify', true ),
@@ -198,10 +200,12 @@ class WPIR_API_Client {
         );
 
         $now     = time();
+        $domain  = wp_parse_url( home_url(), PHP_URL_HOST );
         $payload = array(
-            'iss' => 'image-service',
-            'iat' => $now,
-            'exp' => $now + 300, // 5 minutes.
+            'iss'    => 'image-service',
+            'iat'    => $now,
+            'exp'    => $now + 300, // 5 minutes.
+            'domain' => $domain,
         );
 
         $header_b64  = $this->base64url_encode( wp_json_encode( $header ) );

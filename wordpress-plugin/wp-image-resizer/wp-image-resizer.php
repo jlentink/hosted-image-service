@@ -26,6 +26,7 @@ require_once WPIR_PLUGIN_DIR . 'includes/class-api-client.php';
 require_once WPIR_PLUGIN_DIR . 'includes/class-image-editor.php';
 require_once WPIR_PLUGIN_DIR . 'includes/class-media-handler.php';
 require_once WPIR_PLUGIN_DIR . 'includes/class-crop-editor.php';
+require_once WPIR_PLUGIN_DIR . 'includes/class-crop-page.php';
 
 /**
  * Initialize the plugin.
@@ -40,6 +41,7 @@ function wpir_init() {
     if ( wpir_is_configured() ) {
         new WPIR_Media_Handler();
         new WPIR_Crop_Editor();
+        new WPIR_Crop_Page();
     }
 }
 add_action( 'plugins_loaded', 'wpir_init' );

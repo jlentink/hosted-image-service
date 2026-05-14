@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Crop editor integration.
  *
@@ -30,7 +31,7 @@ class WPIR_Crop_Editor {
      * Enqueue crop editor JS and CSS on media pages.
      */
     public function enqueue_assets( $hook ) {
-        if ( ! in_array( $hook, array( 'upload.php', 'post.php', 'post-new.php' ), true ) ) {
+        if ( ! in_array( $hook, array( 'upload.php', 'post.php', 'post-new.php', 'media_page_wpir-crops' ), true ) ) {
             return;
         }
 
@@ -66,9 +67,12 @@ class WPIR_Crop_Editor {
             'clearCrop'         => __( 'Clear Override', 'wp-image-resizer' ),
             'cancelCrop'        => __( 'Cancel', 'wp-image-resizer' ),
             'cropSaved'         => __( 'Crop saved!', 'wp-image-resizer' ),
+            'regenerating'      => __( 'Regenerating…', 'wp-image-resizer' ),
             'dragHint'          => __( 'Drag to reposition:', 'wp-image-resizer' ),
             'customBadge'       => __( 'Custom', 'wp-image-resizer' ),
             'imageSizes'        => self::get_image_sizes_for_js(),
+            'manageCrops'       => __( 'Manage Crops →', 'wp-image-resizer' ),
+            'cropPageBase'      => admin_url( 'upload.php?page=wpir-crops' ),
         ) );
     }
 
@@ -238,11 +242,22 @@ class WPIR_Crop_Editor {
             wp_json_encode( array( 'x' => $focal_x, 'y' => $focal_y ) )
         );
 
+        $regenerated = false;
+        if ( isset( $_POST['regenerate'] ) && '1' === $_POST['regenerate'] && wpir_is_configured() ) {
+            $handler = new WPIR_Media_Handler();
+            $result  = $handler->regenerate_attachment( $attachment_id );
+            if ( is_wp_error( $result ) ) {
+                wp_send_json_error( $result->get_error_message() );
+            }
+            $regenerated = true;
+        }
+
         wp_send_json_success( array(
             'attachment_id' => $attachment_id,
             'size_name'     => $size_name,
             'focal_x'       => $focal_x,
             'focal_y'       => $focal_y,
+            'regenerated'   => $regenerated,
         ) );
     }
 

@@ -83,12 +83,19 @@
     // -------------------------------------------------------------------------
 
     /**
-     * Create the crop tool DOM inside `container` and return a handle object.
+     * Create the crop tool DOM as a modal in document.body. Returns a handle
+     * object whose `el` is the backdrop — showing/hiding it shows/hides the
+     * modal.
      */
-    function buildCropTool(container) {
+    function buildCropTool() {
+        // Fixed full-screen backdrop.
+        var backdrop = document.createElement('div');
+        backdrop.className = 'wpir-modal-backdrop';
+        backdrop.style.display = 'none';
+
+        // Modal panel (the actual dialog).
         var el = document.createElement('div');
-        el.className = 'wpir-crop-tool';
-        el.style.display = 'none';
+        el.className = 'wpir-modal-panel wpir-crop-tool';
 
         // Title (updated per size when opened).
         var titleEl = document.createElement('p');
@@ -160,10 +167,25 @@
         actionsEl.appendChild(savedMsg);
         el.appendChild(actionsEl);
 
-        container.appendChild(el);
+        backdrop.appendChild(el);
+        document.body.appendChild(backdrop);
+
+        // Close when clicking the backdrop outside the panel.
+        backdrop.addEventListener('click', function (e) {
+            if (e.target === backdrop) {
+                backdrop.style.display = 'none';
+            }
+        });
+
+        // ESC closes the modal when open.
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && backdrop.style.display !== 'none') {
+                backdrop.style.display = 'none';
+            }
+        });
 
         return {
-            el:        el,
+            el:        backdrop,
             titleEl:   titleEl,
             imgWrap:   imgWrap,
             img:       img,
@@ -229,7 +251,7 @@
         var backendScale = Math.max(tw / origW, th / origH);
 
         // Show tool; hide grid.
-        tool.el.style.display    = 'block';
+        tool.el.style.display    = '';
         grid.style.display       = 'none';
         smartNote.style.display  = 'none';
 
@@ -418,15 +440,22 @@
 
         tool.saveBtn.addEventListener('click', function () {
             var focal = getFocal();
+            tool.savedMsg.textContent = wpirL10n.regenerating || 'Regenerating…';
+            tool.savedMsg.classList.add('visible');
             postSizeFocal(
-                { focal_x: focal.x.toFixed(4), focal_y: focal.y.toFixed(4), clear: '0' },
+                {
+                    focal_x:    focal.x.toFixed(4),
+                    focal_y:    focal.y.toFixed(4),
+                    clear:      '0',
+                    regenerate: '1'
+                },
                 function () {
                     sizeFocals[size.name] = focal;
                     badge.style.display = 'inline-block';
-                    tool.savedMsg.classList.add('visible');
-                    setTimeout(function () { tool.savedMsg.classList.remove('visible'); }, 2000);
+                    tool.savedMsg.textContent = wpirL10n.cropSaved || 'Crop saved!';
                     onSaveOrClear();
-                    setTimeout(closeTool, 1500);
+                    // Reload so the on-disk thumbnail in the table reflects the new crop.
+                    setTimeout(function () { window.location.reload(); }, 600);
                 }
             );
         });
@@ -462,132 +491,44 @@
     function buildPreviewSection(wrap, previewUrl, fullUrl, origW, origH, attachmentId, sizeFocals) {
         var sizes = (wpirL10n.imageSizes || []);
         if (!sizes.length || !origW || !origH) {
+            WPIR.openCropToolForSize = function () {};
             return function () {}; // no-op
         }
 
-        var section = document.createElement('div');
-        section.className = 'wpir-preview-sizes';
+        // Crop tool (modal, single shared instance, shown/hidden per size).
+        var tool = buildCropTool();
 
-        var heading = document.createElement('h4');
-        heading.textContent = wpirL10n.cropPreviewsTitle || 'Crop Previews';
-        section.appendChild(heading);
+        // Stubs replacing the removed preview grid / smart-note elements.
+        // openCropTool toggles their display, so they need a style object.
+        var gridStub      = { style: {} };
+        var smartNoteStub = { style: {} };
 
-        // Smart-mode notice (hidden unless mode === 'smart').
-        var smartNote = document.createElement('p');
-        smartNote.className = 'wpir-smart-preview-note';
-        smartNote.textContent = wpirL10n.smartPreviewNote || 'Smart crop — preview not available';
-        smartNote.style.display = 'none';
-        section.appendChild(smartNote);
+        // Build a name → size lookup for openForSize.
+        var sizesByName = {};
+        sizes.forEach(function (s) { sizesByName[s.name] = s; });
 
-        // Preview grid.
-        var grid = document.createElement('div');
-        grid.className = 'wpir-preview-grid';
-        section.appendChild(grid);
-
-        // Crop tool (single shared instance, shown/hidden per size).
-        var tool = buildCropTool(section);
-
-        wrap.appendChild(section);
-
-        // Track last known global focal for calling onSaveOrClear.
-        var lastFx = 0.5, lastFy = 0.5, lastMode = 'center';
-
-        // Per-size updater functions: { name, fn(fx, fy), badge }
-        var sizeUpdaters = [];
-
-        sizes.forEach(function (size) {
-            var dims = previewDims(size.width, size.height);
-
-            var item = document.createElement('div');
-            item.className = 'wpir-preview-item';
-
-            // Overflow-hidden container for the cropped preview.
-            var cropContainer = document.createElement('div');
-            cropContainer.className = 'wpir-preview-crop-container';
-            cropContainer.style.width  = dims.w + 'px';
-            cropContainer.style.height = dims.h + 'px';
-
-            var previewImg = document.createElement('img');
-            previewImg.src = previewUrl;
-            previewImg.alt = '';
-            cropContainer.appendChild(previewImg);
-
-            var labelEl = document.createElement('div');
-            labelEl.className = 'wpir-size-label';
-            labelEl.textContent = size.label + ' – ' + size.width + '×' + size.height;
-
-            // "Custom" badge — shown when a per-size override exists.
-            var badge = document.createElement('span');
-            badge.className = 'wpir-override-badge';
-            badge.textContent = wpirL10n.customBadge || 'Custom';
-            badge.style.display = sizeFocals[size.name] ? 'inline-block' : 'none';
-
-            // "Adjust Crop" button — opens the crop tool for this size.
-            var adjustBtn = document.createElement('button');
-            adjustBtn.type = 'button';
-            adjustBtn.className = 'button-link wpir-crop-adjust-btn';
-            adjustBtn.textContent = wpirL10n.adjustCrop || 'Adjust Crop';
-
-            item.appendChild(cropContainer);
-            item.appendChild(labelEl);
-            item.appendChild(badge);
-            item.appendChild(adjustBtn);
-            grid.appendChild(item);
-
-            // Register preview updater.
-            sizeUpdaters.push({
-                name:  size.name,
-                badge: badge,
-                fn:    function (fx, fy) {
-                    var rect = calcCropRect(origW, origH, size.width, size.height, fx, fy);
-                    applyPreviewCrop(previewImg, origW, origH, rect, dims.w, dims.h);
-                }
-            });
-
-            // Wire up the Adjust Crop button.
-            adjustBtn.addEventListener('click', function () {
-                openCropTool({
-                    size:          size,
-                    attachmentId:  attachmentId,
-                    imageUrl:      fullUrl,
-                    origW:         origW,
-                    origH:         origH,
-                    sizeFocals:    sizeFocals,
-                    tool:          tool,
-                    grid:          grid,
-                    smartNote:     smartNote,
-                    badge:         badge,
-                    onSaveOrClear: function () {
-                        updateAll(lastFx, lastFy, lastMode);
-                    }
-                });
-            });
-        });
-
-        /**
-         * Update all size previews.
-         * Uses per-size focal when available; falls back to global focal.
-         */
-        function updateAll(fx, fy, mode) {
-            lastFx   = fx;
-            lastFy   = fy;
-            lastMode = mode;
-
-            var isSmart = (mode === 'smart');
-            smartNote.style.display = isSmart ? 'block' : 'none';
-            grid.style.display      = isSmart ? 'none'  : 'flex';
-
-            if (isSmart) return;
-
-            sizeUpdaters.forEach(function (u) {
-                var sf  = sizeFocals[u.name];
-                var sfx = sf ? sf.x : (mode === 'center' ? 0.5 : fx);
-                var sfy = sf ? sf.y : (mode === 'center' ? 0.5 : fy);
-                u.fn(sfx, sfy);
+        function openForSize(sizeName) {
+            var size = sizesByName[sizeName];
+            if (!size) return;
+            openCropTool({
+                size:          size,
+                attachmentId:  attachmentId,
+                imageUrl:      fullUrl,
+                origW:         origW,
+                origH:         origH,
+                sizeFocals:    sizeFocals,
+                tool:          tool,
+                grid:          gridStub,
+                smartNote:     smartNoteStub,
+                badge:         { style: {} },
+                onSaveOrClear: function () {}
             });
         }
 
-        return updateAll;
+        WPIR.openCropToolForSize = openForSize;
+
+        // No-op: previews removed.
+        return function () {};
     }
 
     // -------------------------------------------------------------------------
@@ -830,6 +771,19 @@
                         sizeFocals,
                         fullImageUrl
                     );
+
+                    // "Manage Crops" link — navigates to the standalone crop page.
+                    var existingManageLink = detailsEl.querySelector('.wpir-manage-crops-link');
+                    if (existingManageLink) existingManageLink.remove();
+
+                    if (wpirL10n.cropPageBase) {
+                        var manageCropsLink = document.createElement('a');
+                        manageCropsLink.href = wpirL10n.cropPageBase + '&attachment_id=' + model.get('id');
+                        manageCropsLink.textContent = wpirL10n.manageCrops || 'Manage Crops →';
+                        manageCropsLink.className = 'wpir-manage-crops-link';
+                        manageCropsLink.style.cssText = 'display:block;margin-top:8px;font-size:12px;';
+                        detailsEl.appendChild(manageCropsLink);
+                    }
 
                     return this;
                 }

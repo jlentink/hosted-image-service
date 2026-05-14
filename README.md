@@ -1,6 +1,6 @@
 # image-service
 
-[![CI](https://github.com/jlentink/hosted-image-service/actions/workflows/ci.yml/badge.svg)](https://github.com/jlentink/image-service/actions/workflows/ci.yml)
+[![CI](https://github.com/jlentink/hosted-image-service/actions/workflows/ci.yml/badge.svg)](https://github.com/jlentink/hosted-image-service/actions/workflows/ci.yml)
 [![Go 1.23+](https://img.shields.io/badge/go-1.23+-00ADD8?logo=go)](https://go.dev/dl/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 

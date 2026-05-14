@@ -65,7 +65,7 @@ cp image-service.example.toml image-service.toml
 ```yaml
 services:
   image-service:
-    image: ghcr.io/jlentink/image-service:latest
+    image: ghcr.io/jlentink/hosted-image-service:latest
     ports:
       - "8080:8080"
     volumes:
@@ -125,8 +125,8 @@ brew install vips
 **Build and run:**
 
 ```bash
-git clone https://github.com/jlentink/image-service.git
-cd image-service
+git clone https://github.com/jlentink/hosted-image-service.git
+cd hosted-image-service
 
 cp image-service.example.toml image-service.toml
 # Edit image-service.toml — at minimum set auth.jwt_secret

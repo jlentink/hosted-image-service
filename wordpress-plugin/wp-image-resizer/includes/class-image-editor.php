@@ -10,6 +10,13 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
+// Ensure the abstract base class is loaded — WordPress loads it lazily
+// (only when image editing is first needed) so it may not be present yet
+// during plugin activation or early plugin file inclusion.
+if ( ! class_exists( 'WP_Image_Editor' ) ) {
+    require_once ABSPATH . WPINC . '/class-wp-image-editor.php';
+}
+
 class WPIR_Image_Editor extends WP_Image_Editor {
 
     /** @var WPIR_API_Client */
@@ -320,7 +327,7 @@ class WPIR_Image_Editor extends WP_Image_Editor {
     /**
      * Get the output format from plugin settings.
      */
-    private function get_output_format() {
+    protected function get_output_format( $filename = null, $mime_type = null ) {
         return get_option( 'wpir_default_format', 'jpeg' );
     }
 

@@ -1,13 +1,13 @@
 name: CI
 
-# Required secrets : none
+# Required secrets : GITHUB_TOKEN (automatic, used only on master push to push to GHCR)
 # Required vars    : none
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
 
 # Cancel redundant in-progress runs for the same branch/PR.
 concurrency:
@@ -15,8 +15,13 @@ concurrency:
   cancel-in-progress: true
 
 # Minimum required permissions for all jobs.
+# docker-build raises this to packages:write at job level when it needs to push.
 permissions:
   contents: read
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   test:
@@ -52,24 +57,47 @@ jobs:
         run: go build ./cmd/image-service/
 
   docker-build:
-    name: Docker Build (no push)
+    name: Docker Build (push on master)
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write   # needed to push to GHCR on master; harmless on PR/branch runs
     steps:
       - uses: actions/checkout@v4
+
+      # Generate :latest tag metadata — only used when pushing on master.
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
 
       # Buildx is required for GHA layer caching and future multi-platform support.
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # Only log in when we are actually going to push (master branch push events).
+      - name: Log in to GHCR
+        if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
-          push: false
-          tags: image-service:ci
+          # Push only on direct pushes to master; PRs and other branches build only.
+          push: ${{ github.ref == 'refs/heads/master' && github.event_name == 'push' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            VERSION=ci
+            VERSION=${{ github.ref == 'refs/heads/master' && github.event_name == 'push' && 'latest' || 'ci' }}
             BUILD_DATE=${{ github.event.head_commit.timestamp }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

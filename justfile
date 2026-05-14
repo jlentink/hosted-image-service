@@ -97,6 +97,6 @@ bump new_version:
     echo "  - wordpress-plugin/wp-image-resizer/readme.txt"
     echo ""
     echo "To tag and push:"
-    echo "  git add -A && git commit -m 'Bump version to v${VER}'"
+    echo "  git commit -m 'Bump version to v${VER}'"
     echo "  git tag v${VER}"
     echo "  git push && git push --tags"

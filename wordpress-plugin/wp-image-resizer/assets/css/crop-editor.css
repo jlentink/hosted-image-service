@@ -120,37 +120,244 @@
     border-color: #006799;
 }
 
-/* Preview thumbnails */
+/* Crop preview grid --------------------------------------------------------- */
+
 .wpir-preview-sizes {
     margin-top: 16px;
+    border-top: 1px solid #eee;
+    padding-top: 12px;
 }
 
 .wpir-preview-sizes h4 {
-    margin: 0 0 8px 0;
+    margin: 0 0 10px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #3c434a;
 }
 
 .wpir-preview-grid {
     display: flex;
     flex-wrap: wrap;
     gap: 12px;
+    align-items: flex-start;
 }
 
 .wpir-preview-item {
     text-align: center;
-    background: #f9f9f9;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    padding: 8px;
 }
 
-.wpir-preview-item img {
+/* Overflow-hidden box that shows only the cropped region of the image. */
+.wpir-preview-crop-container {
+    position: relative;
+    overflow: hidden;
     display: block;
-    max-width: 150px;
-    max-height: 150px;
-    margin: 0 auto 4px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    background: #f0f0f0;
+    line-height: 0;
 }
 
-.wpir-preview-item .wpir-size-label {
+/* The preview image is absolutely positioned and sized/offset by JS. */
+.wpir-preview-crop-container img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    max-width: none !important; /* override WP admin img max-width */
+    height: auto;
+    display: block;
+}
+
+.wpir-size-label {
     font-size: 11px;
     color: #666;
+    margin-top: 4px;
+    white-space: nowrap;
+}
+
+.wpir-smart-preview-note {
+    font-size: 11px;
+    color: #999;
+    font-style: italic;
+    padding: 4px 0;
+    margin: 0;
+}
+
+/* Per-size crop tool -------------------------------------------------------- */
+
+.wpir-crop-tool {
+    margin-top: 12px;
+    border-top: 1px solid #eee;
+    padding-top: 12px;
+}
+
+.wpir-crop-tool-title {
+    font-weight: 600;
+    margin: 0 0 2px;
+    font-size: 13px;
+    color: #3c434a;
+}
+
+.wpir-crop-tool-hint {
+    font-size: 12px;
+    color: #666;
+    margin: 0 0 8px;
+}
+
+/* Image workspace */
+.wpir-crop-tool-img-wrap {
+    position: relative;
+    display: block;
+    overflow: hidden;
+    width: 100%;
+    border: 2px solid #ccc;
+    border-radius: 4px;
+    line-height: 0;
+    background: #111;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.wpir-crop-tool-img-wrap img {
+    display: block;
+    width: 100%;
+    height: auto;
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-user-drag: none;
+}
+
+/* Crop rectangle — dark overlay via box-shadow, bright inside */
+.wpir-crop-rect {
+    position: absolute;
+    border: 1.5px solid rgba(255, 255, 255, 0.9);
+    cursor: move;
+    box-sizing: border-box;
+    /* Dark overlay covers everything outside the rect */
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
+}
+
+/* Rule-of-thirds grid lines (dashed white) */
+.wpir-crop-grid-line {
+    position: absolute;
+    pointer-events: none;
+}
+
+.wpir-crop-grid-h1 {
+    top: 33.333%;
+    left: 0;
+    right: 0;
+    height: 0;
+    border-top: 1px dashed rgba(255, 255, 255, 0.55);
+}
+
+.wpir-crop-grid-h2 {
+    top: 66.666%;
+    left: 0;
+    right: 0;
+    height: 0;
+    border-top: 1px dashed rgba(255, 255, 255, 0.55);
+}
+
+.wpir-crop-grid-v1 {
+    left: 33.333%;
+    top: 0;
+    bottom: 0;
+    width: 0;
+    border-left: 1px dashed rgba(255, 255, 255, 0.55);
+}
+
+.wpir-crop-grid-v2 {
+    left: 66.666%;
+    top: 0;
+    bottom: 0;
+    width: 0;
+    border-left: 1px dashed rgba(255, 255, 255, 0.55);
+}
+
+/* Drag handles — blue squares at corners and midpoints */
+.wpir-crop-handle {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: #4a90d9;
+    border: 1.5px solid rgba(255, 255, 255, 0.95);
+    box-sizing: border-box;
+    border-radius: 1px;
+    pointer-events: auto;
+}
+
+.wpir-crop-handle[data-pos="tl"] { top: 0;    left: 0;    transform: translate(-50%, -50%); }
+.wpir-crop-handle[data-pos="tc"] { top: 0;    left: 50%;  transform: translate(-50%, -50%); }
+.wpir-crop-handle[data-pos="tr"] { top: 0;    left: 100%; transform: translate(-50%, -50%); }
+.wpir-crop-handle[data-pos="ml"] { top: 50%;  left: 0;    transform: translate(-50%, -50%); }
+.wpir-crop-handle[data-pos="mr"] { top: 50%;  left: 100%; transform: translate(-50%, -50%); }
+.wpir-crop-handle[data-pos="bl"] { top: 100%; left: 0;    transform: translate(-50%, -50%); }
+.wpir-crop-handle[data-pos="bc"] { top: 100%; left: 50%;  transform: translate(-50%, -50%); }
+.wpir-crop-handle[data-pos="br"] { top: 100%; left: 100%; transform: translate(-50%, -50%); }
+/* Directional resize cursors per handle */
+.wpir-crop-handle[data-pos="tl"],
+.wpir-crop-handle[data-pos="br"] { cursor: nwse-resize; }
+
+.wpir-crop-handle[data-pos="tr"],
+.wpir-crop-handle[data-pos="bl"] { cursor: nesw-resize; }
+
+.wpir-crop-handle[data-pos="tc"],
+.wpir-crop-handle[data-pos="bc"] { cursor: ns-resize; }
+
+.wpir-crop-handle[data-pos="ml"],
+.wpir-crop-handle[data-pos="mr"] { cursor: ew-resize; }
+
+
+/* Crop tool action buttons */
+.wpir-crop-tool-actions {
+    margin-top: 10px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.wpir-crop-saved-msg {
+    color: #00a32a;
+    font-size: 13px;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.wpir-crop-saved-msg.visible {
+    opacity: 1;
+}
+
+/* "Custom" override badge on size preview items */
+.wpir-override-badge {
+    display: none; /* toggled by JS: inline-block when override exists */
+    background: #0073aa;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 5px;
+    border-radius: 3px;
+    margin-top: 3px;
+    line-height: 1.5;
+}
+
+/* "Adjust Crop" link button below each size preview */
+.wpir-crop-adjust-btn {
+    display: block;
+    font-size: 11px;
+    margin-top: 4px;
+    color: #0073aa;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.wpir-crop-adjust-btn:hover,
+.wpir-crop-adjust-btn:focus {
+    color: #005177;
+    outline: none;
 }
